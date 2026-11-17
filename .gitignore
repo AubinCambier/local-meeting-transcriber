@@ -1,0 +1,28 @@
+# Enregistrements et transcriptions de réunion : données personnelles, jamais sur GitHub
+reunions/
+*.wav
+*.aiff
+*.m4a
+*.mp3
+*.mp4
+*_transcription*.txt
+*_notes.md
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Modèles téléchargés si quelqu'un les place dans le projet
+*.onnx
+*.tar.bz2
+
+# Systèmes et éditeurs
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Secrets éventuels
+.env
