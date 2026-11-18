@@ -19,6 +19,7 @@ Fonctionne sur **Mac**, **Windows** et **Debian** (Linux). Enregistre **ta voix*
 8. [Référence commune (options, fichiers produits)](#8-référence-commune)
 9. [Bonnes pratiques et protection des données](#9-bonnes-pratiques-et-protection-des-données)
 10. [Petit lexique](#10-petit-lexique)
+11. [Licences](#11-licences)
 
 ---
 
@@ -113,9 +114,9 @@ La transcription utilise des **modèles d'intelligence artificielle** qui tourne
 
 | Modèle | Rôle | Téléchargé depuis | Taille |
 |---|---|---|---|
-| Whisper `small` (par défaut) | Transformer la voix en texte | **Hugging Face** (site qui héberge des modèles d'IA open source) | ~480 Mo |
-| Whisper `medium` / `large-v3` (si tu les choisis) | Transcription plus précise mais plus lente | Hugging Face | ~1,5 Go / ~3 Go |
-| Modèles de reconnaissance des voix | Distinguer « Utilisateur 1 », « Utilisateur 2 »… (`meeting-whisper-final.py` uniquement) | GitHub | ~33 Mo |
+| Whisper `small` (par défaut) | Transformer la voix en texte | **Hugging Face** (site qui héberge des modèles d'IA open source), modèle [`Systran/faster-whisper-small`](https://huggingface.co/Systran/faster-whisper-small) | ~480 Mo |
+| Whisper `medium` / `large-v3` (si tu les choisis) | Transcription plus précise mais plus lente | Hugging Face, modèles [`Systran/faster-whisper-medium`](https://huggingface.co/Systran/faster-whisper-medium) / [`Systran/faster-whisper-large-v3`](https://huggingface.co/Systran/faster-whisper-large-v3) | ~1,5 Go / ~3 Go |
+| Modèles de reconnaissance des voix | Distinguer « Utilisateur 1 », « Utilisateur 2 »… (`meeting-whisper-final.py` uniquement) | **GitHub**, projet [`k2-fsa/sherpa-onnx`](https://github.com/k2-fsa/sherpa-onnx/releases) | ~33 Mo |
 
 **Ce qu'il faut savoir :**
 - Le **premier lancement est plus long** (plusieurs minutes de téléchargement). C'est normal, et ça n'arrive qu'une fois par modèle.
@@ -254,3 +255,12 @@ local-meeting-transcriber/
 | **Son de l'ordinateur** | Ce qui sort de tes haut-parleurs ou de ton casque : la voix des autres participants pendant une visio |
 | **Modèle** | Le « cerveau » de reconnaissance vocale, téléchargé une fois puis utilisé sur ton ordinateur |
 | **Agent / assistant IA** | Claude Code, GitHub Copilot en mode agent… : une IA qui peut lire le projet et lancer des commandes pour toi, avec ton accord |
+
+---
+
+## 11. Licences
+
+- **Ce projet** est sous licence **MIT** (voir [LICENSE](LICENSE)) : tu peux l'utiliser, le modifier et le redistribuer, y compris pour un usage commercial, à condition de garder la mention de copyright.
+- **Les bibliothèques et les modèles d'IA** utilisés (Whisper, sherpa-onnx, pyannote, WeSpeaker…) sont open source et autorisent l'usage commercial. Ils ne sont pas inclus dans le projet : ils sont installés ou téléchargés depuis leur source officielle. Leurs licences et les citations demandées sont dans [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+- **BlackHole** (Mac) est sous GPL-3.0 et s'installe séparément. Ne l'inclus pas dans un paquet que tu distribues sans lire la section qui lui est consacrée dans [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+- **Enregistrer une réunion** reste soumis à la loi : préviens toujours les participants (voir la [section 9](#9-bonnes-pratiques-et-protection-des-données)).
