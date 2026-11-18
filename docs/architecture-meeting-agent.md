@@ -11,17 +11,17 @@ Outil local de prise de notes de réunion : il enregistre l'audio, le transcrit 
 ## Lancer le script
 
 ```bash
-# Chemin relatif (depuis le dossier local-meeting-transcriber)
-cd <DOSSIER_PARENT>/local-meeting-transcriber
+# Chemin relatif (depuis le dossier du projet)
+cd <DOSSIER_DU_PROJET>
 python3 ./script/meeting-agent.py --list                                 # liste les micros
-python3 ./script/meeting-agent.py --device "MacBook Air Microphone"      # Ctrl+C pour arrêter
+python3 ./script/meeting-agent.py --mic "MacBook Air Microphone"      # Ctrl+C pour arrêter
 
 # Chemin absolu (depuis n'importe où)
-python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-agent.py --list
-python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-agent.py --device "MacBook Air Microphone"
+python3 <DOSSIER_DU_PROJET>/script/meeting-agent.py --list
+python3 <DOSSIER_DU_PROJET>/script/meeting-agent.py --mic "MacBook Air Microphone"
 ```
 
-`<DOSSIER_PARENT>` = le chemin du dossier **qui contient** `local-meeting-transcriber` (par exemple `/Users/<ton-utilisateur>/Downloads`). Remplace-le, chevrons compris. Les fichiers sont écrits dans `reunions/` **du dossier courant** : lance le script depuis `local-meeting-transcriber` pour les y retrouver.
+`<DOSSIER_DU_PROJET>` = le chemin de ton dossier `local-meeting-transcriber`, sans les `< >`. Commandes ci-dessus pour Mac. Sous Windows (`py`, `--os windows`) et Debian (`--os debian`) : voir [config-windows.md](config-windows.md) et [config-debian.md](config-debian.md). Les fichiers sont écrits dans `reunions/` **du dossier courant** : lance les commandes depuis le dossier du projet.
 
 ---
 
@@ -30,8 +30,8 @@ python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-agent.py --dev
 ```mermaid
 flowchart LR
     subgraph Poste["💻 Poste macOS (local)"]
-        MIC["Micro / BlackHole<br/>(CoreAudio)"]
-        REC["record()<br/>sounddevice + soundfile"]
+        MIC["Micro + son de l'ordinateur<br/>(BlackHole / loopback / monitor)"]
+        REC["record() – audio_capture.py<br/>soundcard + soundfile"]
         WAV[("reunions/AAAA-MM-JJ_HHMM.wav")]
         STT["transcribe()<br/>faster-whisper + VAD Silero"]
         TXT[("…_transcription.txt")]
@@ -59,7 +59,7 @@ Légende : trait plein = données de la réunion ; trait gras = données de la r
 
 | # | Fonction | Ce qu'elle fait | Composants | Où ça s'exécute | Données de réunion envoyées ? |
 |---|---|---|---|---|---|
-| 1 | `record()` | Capture le périphérique d'entrée choisi (`--device`) en mono 16 kHz jusqu'au Ctrl+C | `sounddevice` (PortAudio → CoreAudio), `soundfile` (libsndfile) | Local | Non |
+| 1 | `record()` | Enregistre **en parallèle** le micro (`--mic`) et le son de l'ordinateur (`--audio` : BlackHole sur Mac, loopback sous Windows, monitor sous Debian, selon `--os`) en 48 kHz jusqu'au Ctrl+C, puis les mélange dans `….wav` (pistes séparées `_micro.wav` et `_audio.wav`). Module commun `audio_capture.py` | `soundcard` (CoreAudio / WASAPI / PulseAudio), `soundfile`, `numpy` | Local | Non |
 | 2 | `transcribe()` | Transcrit le `.wav` en français, avec horodatage par segment | `faster-whisper` (moteur CTranslate2), modèle `Systran/faster-whisper-small`, VAD Silero (`silero_vad_v6.onnx`, fourni avec le paquet, exécuté par `onnxruntime`), `av` (décodage) | Local (CPU) | **Non** |
 | 3 | `summarize()` | Envoie un prompt + la transcription à `claude -p`, récupère le Markdown | CLI Claude Code (`/opt/homebrew/bin/claude`, v2.1.326) → API Anthropic | **Distant (Anthropic)** | **Oui : la transcription complète** |
 | 4 | `main()` | Écrit les fichiers de sortie dans `reunions/` | Python standard | Local | Non |
@@ -81,7 +81,7 @@ Légende : trait plein = données de la réunion ; trait gras = données de la r
 | **Homebrew** (GitHub) | Communauté / GitHub (Microsoft) – 🇺🇸 | Installation de `claude`, `python`, `blackhole-2ch` | IP, liste des formules | Non |
 | npm registry *(si Claude Code installé via npm)* | GitHub / Microsoft – 🇺🇸 | Installation | IP, nom du paquet | Non |
 
-Composants **sans aucun appel réseau** pendant l'exécution : `sounddevice`, `soundfile`, `numpy`, `ctranslate2`, `onnxruntime`, `av`, le VAD Silero, BlackHole (pilote audio local).
+Composants **sans aucun appel réseau** pendant l'exécution : `soundcard`, `soundfile`, `numpy`, `ctranslate2`, `onnxruntime`, `av`, le VAD Silero, BlackHole (pilote audio local).
 
 À noter : malgré le nom « Whisper », **rien n'est envoyé à OpenAI**. Seuls les poids du modèle (licence MIT), convertis par Systran, sont utilisés, et ils tournent en local.
 

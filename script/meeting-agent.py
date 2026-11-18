@@ -42,7 +42,8 @@ def summarize(transcript):
     print("Résumé par Claude (claude -p)…")
     claude = shutil.which("claude")  # sous Windows (npm), la commande est claude.cmd
     if not claude:
-        sys.exit("Commande « claude » introuvable : installe Claude Code (voir README).")
+        sys.exit("Commande « claude » introuvable : installe Claude Code "
+                 "(voir docs/config-mac.md étape 13, config-windows.md ou config-debian.md étape 11).")
     r = subprocess.run([claude, "-p", PROMPT], input=transcript,
                        capture_output=True, text=True, encoding="utf-8", env=env)
     if r.returncode != 0:

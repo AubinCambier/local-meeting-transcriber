@@ -1,366 +1,256 @@
 # local-meeting-transcriber
 
-Outils en ligne de commande pour enregistrer une réunion (ta voix + le son de la visio) sur Mac, Windows ou Debian, et en obtenir la transcription **en local**, voire un compte rendu.
+**Enregistre tes réunions et obtiens leur transcription écrite, directement sur ton ordinateur.**
+Fonctionne sur **Mac**, **Windows** et **Debian** (Linux). Enregistre **ta voix** (le micro) **et le son de la visio** (Teams, Zoom, Meet…).
 
-| Script | Ce qu'il produit | Claude | Données envoyées |
-|---|---|---|---|
-| [`script/meeting-whisper.py`](script/meeting-whisper.py) | Transcription horodatée | ❌ | Aucune |
-| [`script/meeting-whisper-final.py`](script/meeting-whisper-final.py) | Transcription **avec intervenants** (`Utilisateur 1`, `Utilisateur 2`…) | ❌ | Aucune |
-| [`script/meeting-agent.py`](script/meeting-agent.py) | Transcription + **compte rendu** (résumé, décisions, actions, questions) | ✅ | La transcription, envoyée à Anthropic (US) |
-
-Sans compte rendu, utilise **meeting-whisper-final** : tout reste sur le poste.
-
-Architecture détaillée et points de souveraineté : [docs/](docs/)
+> 🔒 **Tes réunions restent sur ton ordinateur.** L'audio et la transcription ne sont envoyés nulle part. La seule exception est le compte rendu automatique par Claude, une option que tu dois choisir explicitement (voir plus bas).
 
 ---
 
-## 1. Installation (une seule fois)
+## Sommaire
 
-Récupère le projet (remplace `<URL_DU_DEPOT>` par l'adresse du dépôt GitHub, bouton *Code* sur la page du dépôt) :
+1. [Ce que fait cet outil](#1-ce-que-fait-cet-outil)
+2. [Comment ça marche](#2-comment-ça-marche)
+3. [Ce dont tu as besoin](#3-ce-dont-tu-as-besoin)
+4. [Étape 1 : récupérer le projet](#4-étape-1--récupérer-le-projet)
+5. [À savoir avant le premier lancement : les modèles et Hugging Face](#5-à-savoir-avant-le-premier-lancement--les-modèles-et-hugging-face)
+6. [**Étape 2 : choisis ton système d'exploitation**](#6-étape-2--choisis-ton-système-dexploitation) ← la suite se passe ici
+7. [Prompt global : un agent IA fait tout avec toi](#7-prompt-global--un-agent-ia-fait-tout-avec-toi)
+8. [Référence commune (options, fichiers produits)](#8-référence-commune)
+9. [Bonnes pratiques et protection des données](#9-bonnes-pratiques-et-protection-des-données)
+10. [Petit lexique](#10-petit-lexique)
+
+---
+
+## 1. Ce que fait cet outil
+
+Le projet contient **3 scripts**. Choisis celui qui correspond à ce que tu veux obtenir :
+
+| Tu veux… | Script à utiliser | Résultat | Données envoyées sur Internet |
+|---|---|---|---|
+| **La transcription avec le nom de qui parle** (recommandé) | `meeting-whisper-final.py` | `[0:00:06] Utilisateur 2 : Merci. De mon côté…` | **Aucune** |
+| La transcription simple, plus rapide | `meeting-whisper.py` | `[0:00:06] Merci. De mon côté…` | **Aucune** |
+| La transcription **et** un compte rendu (résumé, décisions, actions) | `meeting-agent.py` | Transcription + fichier de notes | ⚠️ **Le texte de la transcription est envoyé à Anthropic (Claude), aux États-Unis** |
+
+Si tu hésites, prends **`meeting-whisper-final.py`**.
+
+> ℹ️ « Utilisateur 1 », « Utilisateur 2 »… : l'outil **distingue** les voix, mais ne connaît pas les noms des personnes. C'est à toi de savoir qui est « Utilisateur 1 ».
+
+---
+
+## 2. Comment ça marche
+
+```
+   🎤 Ton micro (ta voix) ─────────────┐
+                                       ├──► enregistrement (.wav) ──► Whisper (sur ton ordinateur) ──► transcription (.txt)
+   🔊 Son de l'ordinateur (la visio) ──┘
+```
+
+1. Tu lances une commande au début de la réunion.
+2. L'outil enregistre **en même temps** ton micro et le son de l'ordinateur, puis les mélange.
+3. À la fin de la réunion, tu appuies sur **Ctrl+C** (les deux touches en même temps) dans la fenêtre du terminal.
+4. L'outil transcrit l'enregistrement **sur ton ordinateur**, avec Whisper, un modèle de reconnaissance vocale. Ça prend quelques minutes.
+5. Tu retrouves l'audio et le texte dans le dossier `reunions/`, à l'intérieur du projet.
+
+**Pourquoi capter « le son de l'ordinateur » ?** Avec un casque, ton micro n'entend pas les autres participants : leur voix va directement dans tes oreilles. Il faut donc aussi enregistrer ce qui sort de l'ordinateur. Chaque système fait ça différemment, c'est pourquoi la suite dépend de ton système d'exploitation.
+
+---
+
+## 3. Ce dont tu as besoin
+
+| Élément | Pourquoi | Où l'installer |
+|---|---|---|
+| Un ordinateur Mac, Windows ou Debian | — | — |
+| **Python** (version 3.9 ou plus récente) | Le langage dans lequel les scripts sont écrits | Expliqué dans la page de ton système (étape 2) |
+| **5 bibliothèques Python** (`soundcard`, `soundfile`, `faster-whisper`, `numpy`, `sherpa-onnx`) | Enregistrer le son, transcrire, reconnaître les voix | Expliqué dans la page de ton système |
+| **Mac uniquement : BlackHole** | Capter le son de la visio (macOS ne sait pas le faire seul) | Expliqué dans la page Mac |
+| Environ **2 Go d'espace disque** | Bibliothèques + modèle de transcription | — |
+| Une connexion Internet **pour l'installation et le premier lancement seulement** | Télécharger les bibliothèques et les modèles | — |
+| *(Optionnel)* Claude Code + un compte Claude | Uniquement pour `meeting-agent.py` (compte rendu) | Expliqué dans la page de ton système |
+
+Compte **30 à 45 minutes** pour la toute première installation, dont la plus grande partie en téléchargements.
+
+---
+
+## 4. Étape 1 : récupérer le projet
+
+Cette étape est **la même pour tous les systèmes**. Choisis **une** des deux méthodes.
+
+### Méthode A : télécharger le ZIP (la plus simple, aucun outil nécessaire)
+
+1. Sur la page GitHub du projet, clique sur le bouton vert **`<> Code`**, puis sur **`Download ZIP`**.
+2. **Extrais** le fichier `.zip` téléchargé (il est en général dans *Téléchargements*) :
+   - **Mac** : double-clic sur le `.zip` ;
+   - **Windows** : clic droit sur le `.zip` > **Extraire tout…** > **Extraire**. Un simple double-clic ne fait qu'ouvrir un aperçu, et les scripts ne fonctionneront pas depuis cet aperçu ;
+   - **Debian/Ubuntu** : clic droit sur le `.zip` > **Extraire ici**.
+3. ⚠️ Le dossier s'appelle probablement **`local-meeting-transcriber-main`**. **Renomme-le en `local-meeting-transcriber`** : toute la documentation utilise ce nom.
+4. Déplace ce dossier à un endroit stable, par exemple dans **Documents**.
+   - ⚠️ **Évite** les dossiers synchronisés dans le cloud (iCloud Drive, OneDrive, Google Drive) : tes enregistrements de réunion y seraient copiés.
+
+### Méthode B : avec git (si tu connais déjà git)
 
 ```bash
-git clone <URL_DU_DEPOT>/local-meeting-transcriber.git
+git clone <URL_DU_DEPOT>
 cd local-meeting-transcriber
 ```
 
-Puis installe les dépendances :
+`<URL_DU_DEPOT>` : l'adresse affichée quand tu cliques sur `<> Code` sur GitHub (onglet *HTTPS*).
 
-```bash
-pip3 install --user soundcard sounddevice soundfile faster-whisper numpy sherpa-onnx
-```
+### Vérification
 
-Le dossier `reunions/` (enregistrements et transcriptions) est exclu de git par le `.gitignore` : **tes réunions ne sont jamais poussées sur GitHub**.
+Ouvre le dossier `local-meeting-transcriber` : tu dois y voir **`README.md`**, **`script`** et **`docs`**. Si ce n'est pas le cas, tu es dans le mauvais dossier (souvent un dossier « en trop » autour, créé par le ZIP).
 
-- `sherpa-onnx` n'est nécessaire que pour `meeting-whisper-final.py`.
-- Utilise `pip3`, pas `pip` : sur macOS, la commande `pip` n'existe pas par défaut.
-- Les messages « script … is not on PATH » à l'installation n'empêchent rien de fonctionner.
-
-Pour `meeting-agent.py` uniquement : installe Claude Code (`npm install -g @anthropic-ai/claude-code`, ou voir la documentation officielle de Claude Code), lance `claude` une fois et connecte-toi **avec le compte de ton entreprise**. Vérifie le compte avec `/status`. Ne définis pas de `ANTHROPIC_API_KEY`.
-
-### Premier lancement
-
-Le premier lancement télécharge les modèles, ce qui prend quelques minutes :
-- Whisper depuis Hugging Face (environ 480 Mo pour `small`). L'avertissement « unauthenticated requests to the HF Hub » n'empêche rien de fonctionner.
-- Pour `meeting-whisper-final.py` : les modèles de diarisation depuis GitHub (environ 33 Mo).
-
-Ensuite, ajoute `HF_HUB_OFFLINE=1` devant les commandes pour interdire tout accès à Hugging Face.
-
-### Autorisation du micro
-
-À la première utilisation, macOS demande l'accès au micro pour le Terminal ou VS Code. Il faut accepter, sinon l'enregistrement sera silencieux.
+> 📝 Retiens l'emplacement de ce dossier : on l'appellera **`<DOSSIER_DU_PROJET>`** dans toute la documentation. Exemples :
+> - Mac : `/Users/<ton-nom>/Documents/local-meeting-transcriber`
+> - Windows : `C:\Users\<ton-nom>\Documents\local-meeting-transcriber`
+> - Debian : `/home/<ton-nom>/Documents/local-meeting-transcriber`
 
 ---
 
-## 2. Lancer un script : chemin relatif ou absolu
+## 5. À savoir avant le premier lancement : les modèles et Hugging Face
 
-Chaque script peut se lancer de deux façons :
+La transcription utilise des **modèles d'intelligence artificielle** qui tournent **sur ton ordinateur**. Ils ne sont pas inclus dans le projet, car ils sont trop gros. Ils sont **téléchargés automatiquement au premier lancement**, puis réutilisés à chaque fois.
 
-| Forme | Exemple | Quand l'utiliser |
+| Modèle | Rôle | Téléchargé depuis | Taille |
+|---|---|---|---|
+| Whisper `small` (par défaut) | Transformer la voix en texte | **Hugging Face** (site qui héberge des modèles d'IA open source) | ~480 Mo |
+| Whisper `medium` / `large-v3` (si tu les choisis) | Transcription plus précise mais plus lente | Hugging Face | ~1,5 Go / ~3 Go |
+| Modèles de reconnaissance des voix | Distinguer « Utilisateur 1 », « Utilisateur 2 »… (`meeting-whisper-final.py` uniquement) | GitHub | ~33 Mo |
+
+**Ce qu'il faut savoir :**
+- Le **premier lancement est plus long** (plusieurs minutes de téléchargement). C'est normal, et ça n'arrive qu'une fois par modèle.
+- Le message **« You are sending unauthenticated requests to the HF Hub »** est **normal** : tu n'as pas besoin de compte Hugging Face. Ignore-le.
+- **Seuls les modèles sont téléchargés.** Ton audio et ta transcription ne sont **jamais** envoyés à Hugging Face ni à GitHub.
+- Une fois les modèles téléchargés, tu peux **interdire tout accès à Hugging Face** avec le réglage `HF_HUB_OFFLINE=1`. La façon de l'écrire dépend du système : elle est donnée dans chaque page.
+  - ⚠️ N'utilise **pas** ce réglage au tout premier lancement, sinon le modèle ne peut pas se télécharger (erreur `LocalEntryNotFoundError`).
+
+---
+
+## 6. Étape 2 : choisis ton système d'exploitation
+
+**La suite dépend de ton système d'exploitation** : les commandes, l'installation de Python et la façon de capter le son de la visio sont différentes. **Clique sur ta page** et suis-la dans l'ordre, sans sauter d'étape :
+
+| Ton ordinateur | Ta page | Ce qui est spécifique |
 |---|---|---|
-| **Relatif** `./script/…` | `python3 ./script/meeting-whisper.py --list` | Après `cd` dans le dossier `local-meeting-transcriber` |
-| **Absolu** `<DOSSIER_PARENT>/local-meeting-transcriber/script/…` | `python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-whisper.py --list` | Depuis n'importe quel dossier |
+| 🍎 **Mac** (MacBook, iMac…) | 👉 **[docs/config-mac.md](docs/config-mac.md)** | Installation de **BlackHole** pour capter la visio |
+| 🪟 **Windows** (10 ou 11) | 👉 **[docs/config-windows.md](docs/config-windows.md)** | Rien à installer pour la visio. Toujours ajouter `--os windows` |
+| 🐧 **Debian** (et Ubuntu, Linux Mint…) | 👉 **[docs/config-debian.md](docs/config-debian.md)** | Environnement virtuel Python obligatoire. Toujours ajouter `--os debian` |
 
-> **`<DOSSIER_PARENT>`** = le chemin du dossier **qui contient** `local-meeting-transcriber`, par exemple `/Users/<ton-utilisateur>/Downloads`. Remplace-le, chevrons `< >` compris. Pour l'obtenir, glisse le dossier `local-meeting-transcriber` dans le terminal : le chemin complet s'affiche.
+> ❓ **Tu ne sais pas quel est ton système ?** Une pomme 🍎 en haut à gauche de l'écran : c'est un **Mac**. Un bouton Démarrer avec le logo Windows en bas à gauche : c'est **Windows**. Sinon, c'est probablement **Linux** : demande à ton service informatique s'il s'agit de Debian ou d'Ubuntu.
 
-> ⚠️ Le dossier `reunions/` est créé **dans le dossier où tu te trouves** au moment du lancement, pas à côté du script. Avec le chemin absolu lancé depuis un autre dossier, les fichiers iront dans `<dossier courant>/reunions/`. Pour les garder au même endroit, fais d'abord `cd <DOSSIER_PARENT>/local-meeting-transcriber`. De même, un chemin passé à `--file` est relatif au dossier courant.
+Chaque page contient, **pour chaque étape** :
+- les commandes exactes à copier-coller ;
+- comment vérifier que l'étape a marché ;
+- un **prompt prêt à l'emploi** pour qu'un assistant IA (Claude Code, GitHub Copilot en mode agent…) t'aide sur cette étape ;
+- les **erreurs possibles** sur ton système et leur solution.
 
-## 3. Choisir son micro
+---
 
-Les exemples suivants utilisent la forme relative, depuis la racine du projet.
+## 7. Prompt global : un agent IA fait tout avec toi
 
-```bash
-cd <DOSSIER_PARENT>/local-meeting-transcriber
-python3 ./script/meeting-whisper-final.py --list
-```
+Si tu utilises un assistant IA capable de lancer des commandes (**Claude Code**, **GitHub Copilot Chat en mode agent**, Cursor…), il peut t'accompagner de A à Z : installation, vérifications, choix du micro et commande finale.
 
-Exemple de sortie (le `>` marque l'entrée par défaut de macOS) :
-```
-  0 iPhone13_Aubin Microphone, Core Audio (1 in, 0 out)
-> 1 MacBook Air Microphone, Core Audio (1 in, 0 out)
-< 2 MacBook Air Speakers, Core Audio (0 in, 2 out)
-```
+1. Ouvre ton assistant **dans le dossier `local-meeting-transcriber`** (dans VS Code : *Fichier > Ouvrir le dossier…*).
+2. Copie le prompt global de **ta** page :
+   - Mac : [section « Prompt global » de config-mac.md](docs/config-mac.md#prompt-global--lagent-fait-tout-avec-toi)
+   - Windows : [section « Prompt global » de config-windows.md](docs/config-windows.md#prompt-global--lagent-fait-tout-avec-toi)
+   - Debian : [section « Prompt global » de config-debian.md](docs/config-debian.md#prompt-global--lagent-fait-tout-avec-toi)
+3. Colle-le dans l'assistant et réponds à ses questions.
 
-### Quel micro mettre dans `--device` ?
+L'agent te pose **des questions précises et toujours les mêmes** (ce que tu veux faire, type de réunion, nombre de participants…). Il **demande ton accord avant toute installation** et ne touche **jamais** au contenu de tes réunions.
 
-`--device` désigne toujours un **micro**, c'est-à-dire une entrée audio : ce qui est enregistré. Les haut-parleurs et le casque (sorties) ne sont jamais enregistrés. Le script écoute **un seul** micro, jamais tous à la fois.
+---
 
-**1. Voir le micro utilisé actuellement par défaut :**
-```bash
-python3 -c "import sounddevice as sd; print(sd.query_devices(kind='input')['name'])"
-```
-→ `MacBook Air Microphone`
+## 8. Référence commune
 
-**2. Lister tous les micros disponibles (noms à copier tels quels dans `--device`) :**
-```bash
-python3 -c "import sounddevice as sd; print('\n'.join(d['name'] for d in sd.query_devices() if d['max_input_channels'] > 0))"
-```
-→ `MacBook Air Microphone`, `Microsoft Teams Audio`… et `iPhone13_Aubin Microphone` quand l'iPhone est à proximité.
+Cette section est **identique pour tous les systèmes**. Seule la façon d'écrire la commande change (`python3` ou `py`, `/` ou `\`), comme expliqué dans ta page.
 
-**Comment ça marche :** la bibliothèque `sounddevice` demande à macOS (CoreAudio) la liste de ses périphériques audio.
-- `kind='input'` renvoie l'**entrée par défaut**, celle choisie dans *Réglages Système > Son > Entrée*. C'est celle qu'utilise le script quand on ne précise pas `--device`.
-- `max_input_channels > 0` ne garde que les périphériques qui **enregistrent**, autrement dit les micros. C'est la colonne `(1 in, …)` de `--list`.
+### Options des scripts
 
-Ces commandes ne font que lire la liste : elles n'enregistrent rien.
+| Option | Rôle | Si tu ne la mets pas | Scripts |
+|---|---|---|---|
+| `--os mac` / `--os windows` / `--os debian` | Indique ton système, pour savoir comment capter le son de la visio | `mac`. ⚠️ **Sous Windows et Debian, il faut toujours l'ajouter** | les 3 |
+| `--list` | Affiche les micros et les sources de son de l'ordinateur disponibles, puis s'arrête. N'enregistre rien | — | les 3 |
+| `--mic "<nom>"` | Le micro à enregistrer (ta voix). Mets le **nom** affiché par `--list` (une partie du nom suffit) | Le micro par défaut de ton système | les 3 |
+| `--audio "<nom>"` | La source du son de l'ordinateur (la visio) | Choisie automatiquement selon `--os` | les 3 |
+| `--audio none` | N'enregistre **que** le micro (réunion en présentiel) | — | les 3 |
+| `--model small` | Taille du modèle : `tiny`, `base`, `small`, `medium`, `large-v3`. Plus gros = plus précis mais plus lent | `small` | les 3 |
+| `--file <chemin>` | Transcrit un fichier audio ou vidéo **existant** au lieu d'enregistrer | — | `meeting-whisper.py`, `meeting-whisper-final.py` |
+| `--speakers <nombre>` | Nombre de personnes qui parlent (toi compris), si tu le connais. **C'est le réglage le plus fiable** | Détection automatique | `meeting-whisper-final.py` |
+| `--threshold 0.5` | Sans `--speakers` : baisse à `0.4` si deux personnes sont fusionnées, monte à `0.6` si une personne apparaît en double. N'utilise pas de valeurs extrêmes (à `0.1`, une même voix est coupée en deux) | `0.5` | `meeting-whisper-final.py` |
+| `--nameFolder <nom>` | Range la réunion dans `reunions/<nom>/1/`, puis `2/`, `3/`… Un simple nom, sans `/` ni `\` | Fichiers rangés directement dans `reunions/` | `meeting-whisper-final.py` |
 
-**3. Choisir :**
+> ⚠️ `--device` est l'ancien nom de `--mic`. Il fonctionne encore, mais utilise `--mic`.
 
-| Ce que tu lances | Micro écouté |
+### Fichiers produits
+
+Ils se trouvent dans le dossier **`reunions/`**, créé **dans le dossier où tu te trouves** quand tu lances la commande. Lance donc toujours les commandes **depuis `<DOSSIER_DU_PROJET>`**.
+
+| Fichier | Contenu |
 |---|---|
-| `--device "MacBook Air Microphone"` | Celui-là. Une partie du nom suffit (`--device "MacBook"`) |
-| `--device 1` | Le n° 1 de `--list`. ⚠️ Ce numéro **change** quand un appareil apparaît ou disparaît : l'iPhone, par exemple, n'est listé que lorsqu'il est à proximité |
-| sans `--device` | Le micro par défaut de macOS (étape 1) |
+| `AAAA-MM-JJ_HHMM.wav` | L'enregistrement complet (micro + son de l'ordinateur mélangés), celui qui est transcrit |
+| `AAAA-MM-JJ_HHMM_micro.wav` | Ton micro seul (uniquement si le son de l'ordinateur était capté aussi) |
+| `AAAA-MM-JJ_HHMM_audio.wav` | Le son de l'ordinateur seul (idem) |
+| `…_transcription.txt` | La transcription (`meeting-whisper.py`, `meeting-agent.py`) |
+| `…_transcription_intervenants.txt` | La transcription avec « Utilisateur 1 », « Utilisateur 2 »… (`meeting-whisper-final.py`) |
+| `…_notes.md` | Le compte rendu de Claude (`meeting-agent.py`) |
 
-→ Passe toujours le **nom**, pas le numéro.
+### Durées indicatives (sur un ordinateur portable récent)
 
-| Micro | Pour une transcription |
+| Pour 1 h de réunion | Durée de traitement après le Ctrl+C |
 |---|---|
-| Micro intégré du Mac, micro USB | ✅ Recommandé |
-| AirPods / casque Bluetooth | ⚠️ macOS réduit la qualité du son quand leur micro est actif |
-| iPhone (Continuité) | ⚠️ Fonctionne, mais disparaît s'il s'éloigne ou se verrouille |
-| `Microsoft Teams Audio` | ❌ Périphérique virtuel de Teams, pas un vrai micro |
-| `BlackHole` | Son de l'ordinateur (visio), voir plus bas |
+| `meeting-whisper.py`, modèle `small` | Quelques minutes à ~15 min |
+| `meeting-whisper-final.py`, modèle `small` | ~15 min pour reconnaître les voix + le temps de transcription |
+| Modèle `medium` ou `large-v3` | Nettement plus long |
 
-**Si l'enregistrement est silencieux** (transcription vide) : active **Terminal** ou **Visual Studio Code** dans *Réglages Système > Confidentialité et sécurité > Microphone*, puis relance le script.
+Pendant le traitement, **laisse le terminal ouvert et l'ordinateur allumé**.
 
-### Prompt prêt à l'emploi (Claude Code, Copilot Chat en mode agent…)
+### Documentation technique
 
-Ouvre ton assistant IA sur le dossier `local-meeting-transcriber` et colle ce texte. L'assistant doit pouvoir lancer des commandes dans le terminal (mode agent) :
+- Architecture et souveraineté de chaque script : [docs/architecture-meeting-whisper.md](docs/architecture-meeting-whisper.md), [docs/architecture-meeting-whisper-final.md](docs/architecture-meeting-whisper-final.md), [docs/architecture-meeting-agent.md](docs/architecture-meeting-agent.md)
+- Plan de la future application (v2) : [docs/superpowers/plans/](docs/superpowers/plans/)
 
-```text
-Dans ce projet local-meeting-transcriber, trouve le micro à utiliser pour enregistrer une réunion et donne-moi la commande prête à lancer. Ne modifie aucun fichier et n'enregistre rien.
-
-1. Depuis la racine du projet, lance ces commandes (lecture seule) :
-   python3 -c "import sounddevice as sd; print(sd.query_devices(kind='input')['name'])"
-   python3 -c "import sounddevice as sd; print('\n'.join(d['name'] for d in sd.query_devices() if d['max_input_channels'] > 0))"
-
-2. Réponds avec :
-   - le micro utilisé actuellement par défaut (nom exact) ;
-   - la liste des micros disponibles, en précisant pour chacun s'il est conseillé pour une transcription :
-     micro intégré ou USB = conseillé ; AirPods/Bluetooth = qualité réduite ; iPhone = instable ;
-     "Microsoft Teams Audio" = pas un vrai micro ; BlackHole = son de l'ordinateur, pas la voix ;
-   - le micro que tu recommandes et pourquoi ;
-   - la commande complète, prête à copier, avec le NOM exact du micro recommandé (jamais son numéro) :
-     HF_HUB_OFFLINE=1 python3 ./script/meeting-whisper-final.py --device "<nom exact>" --nameFolder <nom-du-projet>
-
-3. Si la liste ne contient aucun micro, dis-moi de vérifier
-   Réglages Système > Confidentialité et sécurité > Microphone (Terminal / VS Code).
-```
-
-### Capturer le son de la visio
-
-> ⚠️ **Avec un casque, le micro n'entend pas les autres participants.** Pour capturer le son de l'ordinateur, installe BlackHole (`brew install blackhole-2ch`), crée un « périphérique à sorties multiples » (casque + BlackHole) dans *Configuration audio et MIDI* et choisis-le comme sortie son, puis lance le script avec `--device "BlackHole"`.
->
-> Pour enregistrer **ta voix et la visio ensemble**, il faut un « périphérique agrégé » (micro + BlackHole). **Les scripts actuels ne le gèrent pas encore** : ils enregistrent en mono et ne gardent que le 1er canal, donc seulement le micro.
-
----
-
-## 4. `meeting-whisper-final.py`, transcription avec intervenants (recommandé)
-
-### Commandes de lancement
-
-```bash
-# Chemin relatif (depuis le dossier local-meeting-transcriber)
-cd <DOSSIER_PARENT>/local-meeting-transcriber
-HF_HUB_OFFLINE=1 python3 ./script/meeting-whisper-final.py --device "MacBook Air Microphone" --speakers 4 --nameFolder projetX
-HF_HUB_OFFLINE=1 python3 ./script/meeting-whisper-final.py --file ./reunions/2026-11-17_1257.wav --speakers 2 --nameFolder projetX
-
-# Chemin absolu (depuis n'importe où)
-HF_HUB_OFFLINE=1 python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-whisper-final.py --device "MacBook Air Microphone" --speakers 4 --nameFolder projetX
-HF_HUB_OFFLINE=1 python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-whisper-final.py --file <DOSSIER_PARENT>/local-meeting-transcriber/reunions/2026-11-17_1257.wav --speakers 2 --nameFolder projetX
-```
-
-### Pendant une réunion
-
-1. Lance la commande au début de la réunion.
-2. **Ctrl+C** à la fin.
-3. Attends le message « Transcription enregistrée dans … ».
-
-Résultat dans `reunions/projetX/1/`, puis `2/`, `3/`… pour les réunions suivantes :
-
-```
-[0:00:00] Utilisateur 1 : Bonjour à tous, on commence la réunion sur le budget du projet.
-[0:00:06] Utilisateur 2 : Merci. De mon côté, la partie interface est terminée.
-```
-
-### Sur un fichier existant (audio ou vidéo)
-
-```bash
-HF_HUB_OFFLINE=1 python3 ./script/meeting-whisper-final.py --file ~/Downloads/reunion.mp4 --speakers 3 --nameFolder projetX
-```
-
-### Options
-
-| Option | Rôle |
-|---|---|
-| `--device "<nom>"` | Micro à enregistrer |
-| `--file <chemin>` | Transcrit un fichier existant au lieu d'enregistrer. Avec `--nameFolder`, une copie du fichier est rangée dans le dossier |
-| `--nameFolder <nom>` | Range les fichiers dans `reunions/<nom>/<n>/`. Un simple nom, sans `/` |
-| `--speakers N` | Nombre d'intervenants s'il est connu, **le plus fiable** |
-| `--threshold 0.5` | Sans `--speakers` : baisse le seuil (0.4) si deux personnes sont fusionnées, monte-le (0.6) si une personne apparaît en double. Évite les valeurs extrêmes : à 0.1, une voix est coupée en deux |
-| `--model small` | `tiny` / `base` / `small` / `medium` / `large-v3`. Plus gros = plus précis, mais plus lent |
-
-**Durée :** compte environ 15 min de calcul pour l'identification des voix sur 1 h de réunion, plus le temps de transcription. Le Mac doit rester allumé.
-
----
-
-## 5. `meeting-whisper.py`, transcription simple
-
-Même fonctionnement, sans identification des intervenants, donc plus rapide.
-
-```bash
-# Chemin relatif (depuis le dossier local-meeting-transcriber)
-cd <DOSSIER_PARENT>/local-meeting-transcriber
-HF_HUB_OFFLINE=1 python3 ./script/meeting-whisper.py --device "MacBook Air Microphone"     # Ctrl+C pour arrêter
-HF_HUB_OFFLINE=1 python3 ./script/meeting-whisper.py --file ./reunions/2026-11-17_1257.wav --model medium
-
-# Chemin absolu (depuis n'importe où)
-HF_HUB_OFFLINE=1 python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-whisper.py --device "MacBook Air Microphone"
-HF_HUB_OFFLINE=1 python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-whisper.py --file <DOSSIER_PARENT>/local-meeting-transcriber/reunions/2026-11-17_1257.wav --model medium
-```
-
-Résultat : `reunions/<date>_<heure>_transcription.txt`, ou `<fichier>_transcription.txt` à côté du fichier passé avec `--file`.
-
-Options : `--list`, `--device`, `--file`, `--model`.
-
----
-
-## 6. `meeting-agent.py`, transcription et compte rendu par Claude
-
-```bash
-# Chemin relatif (depuis le dossier local-meeting-transcriber)
-cd <DOSSIER_PARENT>/local-meeting-transcriber
-python3 ./script/meeting-agent.py --device "MacBook Air Microphone"     # Ctrl+C pour arrêter
-
-# Chemin absolu (depuis n'importe où)
-python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-agent.py --device "MacBook Air Microphone"
-```
-
-Après le Ctrl+C, le script transcrit en local, envoie **le texte** à Claude (`claude -p`) et écrit dans `reunions/` :
-- `<date>.wav` : l'audio ;
-- `<date>_transcription.txt` : la transcription ;
-- `<date>_notes.md` : le résumé, les décisions, les actions et les questions ouvertes.
-
-Options : `--list`, `--device`, `--model`.
-
-> ⚠️ Avant de l'utiliser sur une réunion confidentielle, lis [docs/architecture-meeting-agent.md](docs/architecture-meeting-agent.md). La transcription est traitée par Anthropic aux États-Unis, et il faut vérifier que c'est bien le compte de l'entreprise qui est connecté.
-
----
-
-## 7. Bonnes pratiques
-
-- **Préviens les participants** que la réunion est enregistrée. C'est une obligation RGPD.
-- Les fichiers de `reunions/` ne sont ni chiffrés ni purgés automatiquement. Supprime-les quand tu n'en as plus besoin, et ne place pas le projet dans un dossier synchronisé (iCloud, OneDrive).
-- Pendant l'enregistrement, laisse le terminal ouvert. Après le Ctrl+C, attends la fin du traitement.
-
-## 8. Erreurs potentielles
-
-Le système se choisit avec `--os mac` (défaut), `--os windows` ou `--os debian`. ✅ = erreur rencontrée et résolue sur un vrai poste. Les sections Windows et Debian n'ont **pas encore été testées sur une vraie machine**.
-
-### 8.1 Mac
-
-**Installation**
-
-| Symptôme | Cause | Solution |
-|---|---|---|
-| ✅ `zsh: command not found: pip` | Sur macOS, la commande s'appelle `pip3` | `pip3 install --user …` |
-| ✅ `brew install pip` → « No available formula with the name "pip" » | pip est livré avec Python, pas séparément | Inutile : utilise `pip3`, ou `brew install python` pour un Python récent |
-| ✅ « The script … is installed in '…/bin' which is not on PATH » | Des outils annexes sont installés hors du PATH | Sans conséquence, à ignorer |
-| ✅ « You are using pip version 21.2.4 » | pip est ancien | Sans conséquence |
-| `error: externally-managed-environment` | Python installé par Homebrew, qui bloque `pip install` global | Crée un environnement virtuel : `python3 -m venv .venv && source .venv/bin/activate` |
-| ✅ **BlackHole absent de `--list` après `brew install blackhole-2ch`** | Installation interrompue (souvent à l'étape du mot de passe), ou macOS n'a pas rechargé ses pilotes | 1. Vérifie `brew list --cask \| grep blackhole` → doit afficher `blackhole-2ch`. 2. Vérifie `ls /Library/Audio/Plug-Ins/HAL/` → doit contenir `BlackHole2ch.driver`. Sinon, relance `brew install blackhole-2ch` et tape ton mot de passe (rien ne s'affiche pendant la saisie, c'est normal). 3. Recharge le service audio : `sudo killall coreaudiod`, ou redémarre le Mac |
-| `brew install blackhole-2ch` refusé ou bloqué | Mac d'entreprise (MDM) qui interdit les pilotes | Demande l'accord du service informatique |
-
-**Premier lancement**
-
-| Symptôme | Cause | Solution |
-|---|---|---|
-| ✅ « You are sending unauthenticated requests to the HF Hub » | Téléchargement du modèle Whisper sans compte Hugging Face | Sans conséquence : attends la fin du téléchargement (environ 480 Mo pour `small`) |
-| Le téléchargement reste bloqué à 0 % | Le système de téléchargement Xet de Hugging Face est bloqué | Ctrl+C, puis relance avec `HF_HUB_DISABLE_XET=1` devant la commande |
-| ✅ `LocalEntryNotFoundError … outgoing traffic has been disabled` | `HF_HUB_OFFLINE=1` alors que ce modèle (`--model`) n'a jamais été téléchargé | Lance une première fois **sans** `HF_HUB_OFFLINE=1` |
-| ✅ `RuntimeWarning: … encountered in matmul` / `mel_spec = …` | Avertissement de calcul de numpy | Sans conséquence |
-| ✅ « Tip: experimental MPS backend is available » | Simple conseil de ctranslate2 | Sans conséquence |
-
-**Enregistrement**
-
-| Symptôme | Cause | Solution |
-|---|---|---|
-| ✅ « Aucune source de son de l'ordinateur trouvée : … BlackHole n'est pas installé » | BlackHole absent ou non détecté | Voir la ligne BlackHole ci-dessus, ou `--audio none` pour enregistrer le micro seul |
-| ✅ « La piste du son de l'ordinateur est silencieuse » | La sortie son de macOS ne passe pas par BlackHole | Choisis le **périphérique à sorties multiples** (casque + BlackHole) comme sortie son |
-| Tu n'entends plus la visio | Sortie son réglée sur BlackHole **seul** | Choisis le périphérique à sorties multiples, pas BlackHole directement |
-| Transcription vide, micro silencieux | macOS bloque l'accès au micro | *Réglages Système > Confidentialité et sécurité > Microphone* : active Terminal ou VS Code |
-| ✅ « Périphérique « … » introuvable » | Nom mal écrit | `--list` et copie le nom exact (une partie du nom suffit) |
-| ✅ Le mauvais micro est enregistré avec `--mic 1` | Les numéros changent (l'iPhone apparaît ou disparaît) | Utilise le **nom** : `--mic "MacBook Air Microphone"` |
-| ✅ « Système détecté : mac, mais --os vaut … » | Mauvais `--os` | Retire `--os`, ou mets `--os mac` |
-| ✅ « macOS does not support loopback recording functionality » | `--os windows` ou `--os debian` lancé sur un Mac | Utilise `--os mac` |
-| Son dégradé avec AirPods / casque Bluetooth | macOS bascule en mode « appel » quand leur micro est actif | Utilise le micro du Mac : `--mic "MacBook Air Microphone"` |
-| `Commande « claude » introuvable` (meeting-agent) | Claude Code n'est pas installé ou pas dans le PATH | Installe Claude Code, puis vérifie avec `which claude` |
-
-### 8.2 Windows
-
-Commandes : `py` au lieu de `python3`, `.\script\…` au lieu de `./script/…`, et en PowerShell `$env:HF_HUB_OFFLINE=1; py .\script\…` au lieu de `HF_HUB_OFFLINE=1 python3 …`.
-
-**Installation**
-
-| Symptôme | Cause | Solution |
-|---|---|---|
-| `python3` ouvre le Microsoft Store, ou « Python est introuvable » | Python n'est pas installé, ou seul le raccourci du Store existe | Installe Python depuis python.org en cochant **« Add python.exe to PATH »**, puis utilise `py` |
-| `pip` introuvable | pip n'est pas dans le PATH | `py -m pip install soundcard soundfile faster-whisper numpy sherpa-onnx` |
-| Activation de `.venv\Scripts\Activate.ps1` refusée (« l'exécution de scripts est désactivée ») | Stratégie d'exécution de PowerShell | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, ou utilise `cmd` |
-| Erreur de DLL au chargement de faster-whisper / ctranslate2 / onnxruntime | Il manque les bibliothèques Microsoft Visual C++ | Installe le **Microsoft Visual C++ Redistributable** (x64) |
-| Avertissement Hugging Face sur les « symlinks » / le « Developer Mode » | Windows limite les liens symboliques | Sans conséquence : le cache prend juste un peu plus de place |
-| BlackHole introuvable | BlackHole n'existe que sur Mac | Inutile sous Windows : le son de l'ordinateur est capté nativement (loopback) |
-
-**Enregistrement**
-
-| Symptôme | Cause | Solution |
-|---|---|---|
-| Transcription vide, micro silencieux | Windows bloque l'accès au micro | *Paramètres > Confidentialité et sécurité > Microphone* : active **« Autoriser les applications de bureau à accéder à votre microphone »** |
-| « Système détecté : windows, mais --os vaut « mac » » + pas de son de la visio | `--os` oublié : le défaut est `mac` | Ajoute `--os windows` |
-| « La piste du son de l'ordinateur est silencieuse » | Teams / Zoom joue sur une autre sortie que la sortie par défaut de Windows | Règle la même sortie dans Teams/Zoom et dans Windows, ou passe-la à `--audio "<nom de la sortie>"` (voir `--list --os windows`) |
-| Erreur d'ouverture du périphérique ou piste vide alors qu'une application utilise le son | Une application a pris le contrôle **exclusif** du périphérique | *Panneau de configuration Son > Propriétés du périphérique > Avancé* : décoche « Autoriser les applications à prendre le contrôle exclusif » |
-| Ctrl+C n'arrête pas l'enregistrement | Terminal particulier | Essaie Ctrl+Pause, ou lance depuis Windows Terminal / PowerShell |
-| Accents illisibles dans la console | Ancienne console en page de code non UTF-8 | Utilise Windows Terminal, ou tape `chcp 65001` avant de lancer. Les fichiers `.txt` sont écrits en UTF-8 quoi qu'il arrive |
-| Son dégradé avec un casque Bluetooth | Mode « mains libres » activé quand son micro est utilisé | Utilise un autre micro avec `--mic` |
-| `Commande « claude » introuvable` (meeting-agent) | Le dossier global de npm n'est pas dans le PATH | Vérifie `where claude`. Ajoute `%AppData%\npm` au PATH si besoin |
-
-### 8.3 Debian (et dérivés : Ubuntu…)
-
-Commandes identiques à Mac (`python3`, `./script/…`, `HF_HUB_OFFLINE=1 python3 …`), avec `--os debian`.
-
-**Installation**
-
-| Symptôme | Cause | Solution |
-|---|---|---|
-| `error: externally-managed-environment` avec `pip install` | Debian 12+ interdit `pip install` hors environnement virtuel (PEP 668) | `sudo apt install python3-venv python3-pip`, puis `python3 -m venv .venv && source .venv/bin/activate && pip install soundcard soundfile faster-whisper numpy sherpa-onnx`. Réactive avec `source .venv/bin/activate` à chaque nouveau terminal |
-| `OSError: cannot load library 'libpulse.so.0'` | `soundcard` a besoin de la bibliothèque PulseAudio | `sudo apt install libpulse0`. Avec PipeWire : `sudo apt install pipewire-pulse` |
-| `OSError: sndfile library not found` | `libsndfile` absent | `sudo apt install libsndfile1` |
-| `npm install -g` refusé, ou Claude Code qui ne démarre pas (meeting-agent) | Version de Node.js trop ancienne dans les dépôts Debian, ou droits d'écriture | Installe une version récente de Node.js (dépôt officiel Node.js) ou l'installeur officiel de Claude Code. N'utilise pas `sudo npm` |
-| BlackHole introuvable | BlackHole n'existe que sur Mac | Inutile : le son de l'ordinateur est capté via la source « monitor » |
-
-**Enregistrement**
-
-| Symptôme | Cause | Solution |
-|---|---|---|
-| `--list --os debian` n'affiche aucune source de son de l'ordinateur | Pas de serveur son PulseAudio/PipeWire (serveur sans interface graphique, session SSH, ALSA seul) | Installe et démarre PipeWire (`pipewire-pulse`) ou PulseAudio. Vérifie avec `pactl list short sources` : une source finissant par `.monitor` doit apparaître |
-| « La piste du son de l'ordinateur est silencieuse » | Le son de la visio sort sur une autre sortie que la sortie par défaut | `pactl get-default-sink` pour voir la sortie par défaut. Règle-la dans les paramètres son, ou passe le bon « Monitor of … » à `--audio` |
-| Aucun micro ou erreur d'accès | Script lancé avec `sudo`, qui n'a pas accès à la session son de l'utilisateur | Lance le script **sans** `sudo` |
-| Micro muet | Micro coupé ou volume à 0 dans le mixeur | `pavucontrol` (`sudo apt install pavucontrol`), onglet *Périphériques d'entrée* |
-| « Système détecté : debian, mais --os vaut « mac » » | `--os` oublié | Ajoute `--os debian` |
-
-## Structure
+### Structure du projet
 
 ```
 local-meeting-transcriber/
-├── README.md
-├── .gitignore               # exclut reunions/, l'audio, les transcriptions, .venv…
+├── README.md                 ← tu es ici
+├── .gitignore                # empêche l'envoi de reunions/ et de l'audio sur GitHub
 ├── script/
-│   ├── audio_capture.py         # module commun : micro + son de l'ordinateur (mac/windows/debian)
-│   ├── meeting-agent.py
+│   ├── audio_capture.py      # module commun : micro + son de l'ordinateur (mac/windows/debian)
 │   ├── meeting-whisper.py
-│   └── meeting-whisper-final.py
+│   ├── meeting-whisper-final.py
+│   └── meeting-agent.py
 ├── docs/
-│   ├── architecture-meeting-agent.md
-│   ├── architecture-meeting-whisper.md
-│   └── architecture-meeting-whisper-final.md
-└── reunions/            # créé automatiquement : audio et transcriptions
+│   ├── config-mac.md         # guide Mac
+│   ├── config-windows.md     # guide Windows
+│   ├── config-debian.md      # guide Debian
+│   └── architecture-*.md     # documentation technique
+└── reunions/                 # créé automatiquement : tes enregistrements et transcriptions
 ```
+
+---
+
+## 9. Bonnes pratiques et protection des données
+
+- **Préviens toujours les participants** que la réunion est enregistrée. C'est une obligation légale (RGPD).
+- Les fichiers de `reunions/` **ne sont ni chiffrés ni supprimés automatiquement**. Supprime-les quand tu n'en as plus besoin.
+- **Ne mets pas le projet dans un dossier synchronisé** (iCloud Drive, OneDrive, Google Drive).
+- Le dossier `reunions/` est **exclu de git** par le fichier `.gitignore` : tes réunions ne sont jamais envoyées sur GitHub, même si tu fais un `git push`.
+- **`meeting-agent.py` envoie le texte de la transcription à Anthropic (États-Unis).** Avant de l'utiliser pour une réunion confidentielle, lis [docs/architecture-meeting-agent.md](docs/architecture-meeting-agent.md) et vérifie que tu es connecté avec le **compte de ton entreprise**.
+
+---
+
+## 10. Petit lexique
+
+| Mot | Signification |
+|---|---|
+| **Terminal** | Une fenêtre où l'on tape des commandes au clavier (au lieu de cliquer). Chaque page explique comment l'ouvrir |
+| **Commande** | Une ligne de texte à copier dans le terminal, puis à valider avec la touche **Entrée** |
+| **Ctrl+C** | Appuyer sur **Ctrl** et **C** en même temps dans le terminal : arrête l'enregistrement. Sur Mac aussi, c'est bien **Ctrl** (pas Cmd) |
+| **Chemin** | L'adresse d'un dossier ou d'un fichier, par exemple `/Users/marie/Documents/local-meeting-transcriber` |
+| **`<DOSSIER_DU_PROJET>`** | À remplacer par le chemin de **ton** dossier `local-meeting-transcriber`, **sans les `< >`** |
+| **Micro** | Ce qui capte ta voix : micro intégré, micro du casque, micro USB… |
+| **Son de l'ordinateur** | Ce qui sort de tes haut-parleurs ou de ton casque : la voix des autres participants pendant une visio |
+| **Modèle** | Le « cerveau » de reconnaissance vocale, téléchargé une fois puis utilisé sur ton ordinateur |
+| **Agent / assistant IA** | Claude Code, GitHub Copilot en mode agent… : une IA qui peut lire le projet et lancer des commandes pour toi, avec ton accord |

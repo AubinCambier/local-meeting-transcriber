@@ -72,7 +72,8 @@ def list_devices(os_name):
         mark = "  ← par défaut" if default and m.name == default.name else ""
         print(f"     {m.name}{mark}")
     if not sources:
-        hint = "installe BlackHole (voir README)" if os_name == "mac" else "aucune source trouvée"
+        hint = ("installe BlackHole : voir docs/config-mac.md, étape 6" if os_name == "mac"
+                else f"voir docs/config-{os_name}.md, étape 6")
         print(f"     (aucune : {hint})")
 
 def _find(name, loopback=False):

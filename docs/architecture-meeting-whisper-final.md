@@ -11,19 +11,19 @@ Transcription de réunion **100 % locale avec identification des intervenants** 
 ## Lancer le script
 
 ```bash
-# Chemin relatif (depuis le dossier local-meeting-transcriber)
-cd <DOSSIER_PARENT>/local-meeting-transcriber
+# Chemin relatif (depuis le dossier du projet)
+cd <DOSSIER_DU_PROJET>
 python3 ./script/meeting-whisper-final.py --list                                                   # liste les micros
-HF_HUB_OFFLINE=1 python3 ./script/meeting-whisper-final.py --device "MacBook Air Microphone" --speakers 4 --nameFolder projetX
+HF_HUB_OFFLINE=1 python3 ./script/meeting-whisper-final.py --mic "MacBook Air Microphone" --speakers 4 --nameFolder projetX
 HF_HUB_OFFLINE=1 python3 ./script/meeting-whisper-final.py --file ./reunions/2026-11-17_1257.wav --speakers 2 --nameFolder projetX
 
 # Chemin absolu (depuis n'importe où)
-python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-whisper-final.py --list
-HF_HUB_OFFLINE=1 python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-whisper-final.py --device "MacBook Air Microphone" --speakers 4 --nameFolder projetX
-HF_HUB_OFFLINE=1 python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-whisper-final.py --file <DOSSIER_PARENT>/local-meeting-transcriber/reunions/2026-11-17_1257.wav --speakers 2 --nameFolder projetX
+python3 <DOSSIER_DU_PROJET>/script/meeting-whisper-final.py --list
+HF_HUB_OFFLINE=1 python3 <DOSSIER_DU_PROJET>/script/meeting-whisper-final.py --mic "MacBook Air Microphone" --speakers 4 --nameFolder projetX
+HF_HUB_OFFLINE=1 python3 <DOSSIER_DU_PROJET>/script/meeting-whisper-final.py --file <DOSSIER_DU_PROJET>/reunions/2026-11-17_1257.wav --speakers 2 --nameFolder projetX
 ```
 
-`<DOSSIER_PARENT>` = le chemin du dossier **qui contient** `local-meeting-transcriber` (par exemple `/Users/<ton-utilisateur>/Downloads`). Remplace-le, chevrons compris. `reunions/` (et donc `reunions/<nameFolder>/<n>/`) est créé **dans le dossier courant** : lance le script depuis `local-meeting-transcriber` pour y retrouver tes fichiers.
+`<DOSSIER_DU_PROJET>` = le chemin de ton dossier `local-meeting-transcriber`, sans les `< >`. Commandes ci-dessus pour Mac. Sous Windows (`py`, `--os windows`) et Debian (`--os debian`) : voir [config-windows.md](config-windows.md) et [config-debian.md](config-debian.md). Les fichiers sont écrits dans `reunions/` **du dossier courant** : lance les commandes depuis le dossier du projet.
 
 ---
 
@@ -32,9 +32,9 @@ HF_HUB_OFFLINE=1 python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeti
 ```mermaid
 flowchart LR
     subgraph Poste["💻 Poste macOS (local)"]
-        MIC["Micro / BlackHole"]
+        MIC["Micro + son de l'ordinateur<br/>(BlackHole / loopback / monitor)"]
         FILE[("Fichier audio/vidéo<br/>(--file)")]
-        REC["record()"]
+        REC["record() – audio_capture.py"]
         DEC["decode_audio()<br/>PyAV → 16 kHz mono"]
         DIA["diarize()<br/>sherpa-onnx"]
         STT["WhisperModel.transcribe()<br/>horodatage par mot"]
@@ -61,7 +61,7 @@ flowchart LR
 | # | Fonction | Ce qu'elle fait | Composants |
 |---|---|---|---|
 | 1 | `output_folder()` | `reunions/` par défaut. Avec `--nameFolder X`, crée `reunions/X/<n>/`, où n = le plus grand numéro existant + 1. Refuse les noms contenant `/` ou `..` | Python standard |
-| 2 | `record()` | Enregistre le micro choisi jusqu'au Ctrl+C. Ignoré avec `--file`, auquel cas le fichier est copié dans le dossier si `--nameFolder` est utilisé | `sounddevice`, `soundfile` |
+| 2 | `record()` | Enregistre **en parallèle** le micro (`--mic`) et le son de l'ordinateur (`--audio` : BlackHole sur Mac, loopback sous Windows, monitor sous Debian, selon `--os`) en 48 kHz jusqu'au Ctrl+C, puis les mélange dans `….wav` (pistes séparées `_micro.wav` et `_audio.wav`). Module commun `audio_capture.py`. Ignoré avec `--file`, auquel cas le fichier est copié dans le dossier si `--nameFolder` est utilisé | `soundcard` (CoreAudio / WASAPI / PulseAudio), `soundfile`, `numpy` |
 | 3 | `decode_audio()` | Convertit l'entrée (wav, mp4, m4a…) en 16 kHz mono | PyAV (via `faster-whisper`) |
 | 4 | `fetch_models()` | Télécharge les modèles de diarisation s'ils sont absents | `urllib`, `tarfile` |
 | 5 | `diarize()` | Découpe l'audio en tours de parole et regroupe les voix similaires. Utilise tous les cœurs CPU | sherpa-onnx : segmentation pyannote 3.0 (ONNX), empreinte vocale WeSpeaker ResNet34 (VoxCeleb), regroupement `FastClustering` |

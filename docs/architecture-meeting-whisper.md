@@ -11,19 +11,19 @@ Transcription de réunion **100 % locale**. Le script enregistre l'audio, ou lit
 ## Lancer le script
 
 ```bash
-# Chemin relatif (depuis le dossier local-meeting-transcriber)
-cd <DOSSIER_PARENT>/local-meeting-transcriber
+# Chemin relatif (depuis le dossier du projet)
+cd <DOSSIER_DU_PROJET>
 python3 ./script/meeting-whisper.py --list                                                    # liste les micros
-HF_HUB_OFFLINE=1 python3 ./script/meeting-whisper.py --device "MacBook Air Microphone"        # Ctrl+C pour arrêter
+HF_HUB_OFFLINE=1 python3 ./script/meeting-whisper.py --mic "MacBook Air Microphone"        # Ctrl+C pour arrêter
 HF_HUB_OFFLINE=1 python3 ./script/meeting-whisper.py --file ./reunions/2026-11-17_1257.wav    # fichier existant
 
 # Chemin absolu (depuis n'importe où)
-python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-whisper.py --list
-HF_HUB_OFFLINE=1 python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-whisper.py --device "MacBook Air Microphone"
-HF_HUB_OFFLINE=1 python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeting-whisper.py --file <DOSSIER_PARENT>/local-meeting-transcriber/reunions/2026-11-17_1257.wav
+python3 <DOSSIER_DU_PROJET>/script/meeting-whisper.py --list
+HF_HUB_OFFLINE=1 python3 <DOSSIER_DU_PROJET>/script/meeting-whisper.py --mic "MacBook Air Microphone"
+HF_HUB_OFFLINE=1 python3 <DOSSIER_DU_PROJET>/script/meeting-whisper.py --file <DOSSIER_DU_PROJET>/reunions/2026-11-17_1257.wav
 ```
 
-`<DOSSIER_PARENT>` = le chemin du dossier **qui contient** `local-meeting-transcriber` (par exemple `/Users/<ton-utilisateur>/Downloads`). Remplace-le, chevrons compris. En mode enregistrement, les fichiers sont écrits dans `reunions/` **du dossier courant**. Avec `--file`, la transcription est écrite à côté du fichier audio.
+`<DOSSIER_DU_PROJET>` = le chemin de ton dossier `local-meeting-transcriber`, sans les `< >`. Commandes ci-dessus pour Mac. Sous Windows (`py`, `--os windows`) et Debian (`--os debian`) : voir [config-windows.md](config-windows.md) et [config-debian.md](config-debian.md). Les fichiers sont écrits dans `reunions/` **du dossier courant** : lance les commandes depuis le dossier du projet.
 
 ---
 
@@ -32,9 +32,9 @@ HF_HUB_OFFLINE=1 python3 <DOSSIER_PARENT>/local-meeting-transcriber/script/meeti
 ```mermaid
 flowchart LR
     subgraph Poste["💻 Poste macOS (local)"]
-        MIC["Micro / BlackHole<br/>(CoreAudio)"]
+        MIC["Micro + son de l'ordinateur<br/>(BlackHole / loopback / monitor)"]
         FILE[("Fichier audio/vidéo<br/>existant (--file)")]
-        REC["record()<br/>sounddevice + soundfile"]
+        REC["record() – audio_capture.py<br/>soundcard + soundfile"]
         WAV[("reunions/AAAA-MM-JJ_HHMM.wav")]
         STT["transcribe()<br/>faster-whisper + VAD Silero"]
         TXT[("…_transcription.txt")]
@@ -54,7 +54,7 @@ flowchart LR
 
 | # | Fonction | Ce qu'elle fait | Composants | Données envoyées ? |
 |---|---|---|---|---|
-| 1 | `record()` | Capture le périphérique choisi (`--device`) en mono 16 kHz jusqu'au Ctrl+C. Étape ignorée avec `--file` | `sounddevice` (PortAudio → CoreAudio), `soundfile` (libsndfile) | Non |
+| 1 | `record()` | Enregistre **en parallèle** le micro (`--mic`) et le son de l'ordinateur (`--audio` : BlackHole sur Mac, loopback sous Windows, monitor sous Debian, selon `--os`) en 48 kHz jusqu'au Ctrl+C, puis les mélange dans `….wav` (pistes séparées `_micro.wav` et `_audio.wav`). Module commun `audio_capture.py`. Étape ignorée avec `--file` | `soundcard` (CoreAudio / WASAPI / PulseAudio), `soundfile`, `numpy` | Non |
 | 2 | `transcribe()` | Transcrit en français et affiche chaque segment horodaté au fil de l'eau | `faster-whisper` (CTranslate2, CPU), modèle `Systran/faster-whisper-<taille>`, VAD Silero (ONNX, fourni avec le paquet), PyAV (décodage) | **Non** |
 | 3 | `main()` | Écrit `reunions/<horodatage>_transcription.txt`, ou `<fichier>_transcription.txt` à côté du fichier passé avec `--file` | Python standard | Non |
 
